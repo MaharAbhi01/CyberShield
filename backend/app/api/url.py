@@ -1,3 +1,7 @@
+import re
+
+from fastapi import APIRouter
+from pydantic import BaseModel, HttpUrl, Field, field_validator
 from fastapi import APIRouter
 from pydantic import BaseModel, HttpUrl, Field
 
@@ -11,10 +15,49 @@ router = APIRouter(
 
 
 class URLRequest(BaseModel):
-    url: HttpUrl = Field(
-        ...,
-        max_length=2048
-    )
+    url: HttpUrl = Field(..., max_length=2048)
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def normalize_url(cls, value):
+
+        if not isinstance(value, str):
+            return value
+
+        value = value.strip()
+
+        if not value:
+            raise ValueError("URL cannot be empty.")
+
+        # Reject malformed HTTP/HTTPS protocols
+        if re.match(r"^https?:(?!//)", value, re.IGNORECASE):
+            raise ValueError("Malformed URL protocol.")
+
+        if re.match(r"^https?//", value, re.IGNORECASE):
+            raise ValueError("Malformed URL protocol.")
+
+        # Preserve valid HTTP/HTTPS URLs
+        if re.match(r"^https?://", value, re.IGNORECASE):
+
+            remaining = re.sub(
+                r"^https?://", "", value, count=1, flags=re.IGNORECASE
+            )
+
+            if re.match(r"^https?://", remaining, re.IGNORECASE):
+                raise ValueError("Duplicate URL protocol.")
+
+            return value
+
+        # Reject other explicitly provided protocols
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", value):
+            raise ValueError("Only HTTP and HTTPS URLs are supported.")
+
+        # Handle protocol-relative URLs
+        if value.startswith("//"):
+            return "https:" + value
+
+        # Add HTTPS when protocol is missing
+        return "https://" + value
 
 
 class URLFeatures(BaseModel):
