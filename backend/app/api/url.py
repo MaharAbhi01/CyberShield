@@ -1,11 +1,11 @@
 
-import re
-from urllib.parse import urlsplit, urlunsplit
-
 from fastapi import APIRouter
-from pydantic import BaseModel, HttpUrl, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
-from app.services.url_feature_extractor import extract_url_features
+from app.services.url_feature_extractor import (
+    extract_url_features,
+    normalize_url as canonical_normalize_url
+)
 
 
 router = APIRouter(
@@ -14,71 +14,22 @@ router = APIRouter(
 )
 
 
+# ============================================================
+# 1. URL REQUEST
+# ============================================================
+
 class URLRequest(BaseModel):
     url: str = Field(..., max_length=2048)
 
     @field_validator("url", mode="before")
     @classmethod
     def normalize_url(cls, value):
+        return canonical_normalize_url(value)
 
-        if not isinstance(value, str):
-            return value
 
-        value = value.strip()
-
-        if not value:
-            raise ValueError("URL cannot be empty.")
-
-        # Reject malformed HTTP/HTTPS protocols
-        if re.match(r"^https?:(?!//)", value, re.IGNORECASE):
-            raise ValueError("Malformed URL protocol.")
-
-        if re.match(r"^https?//", value, re.IGNORECASE):
-            raise ValueError("Malformed URL protocol.")
-
-        # Preserve valid HTTP/HTTPS URLs
-        if re.match(r"^https?://", value, re.IGNORECASE):
-
-            remaining = re.sub(
-                r"^https?://",
-                "",
-                value,
-                count=1,
-                flags=re.IGNORECASE
-            )
-
-            if re.match(r"^https?://", remaining, re.IGNORECASE):
-                raise ValueError("Duplicate URL protocol.")
-
-        # Reject unsupported protocols
-        elif re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", value):
-            raise ValueError("Only HTTP and HTTPS URLs are supported.")
-
-        # Handle protocol-relative URLs
-        elif value.startswith("//"):
-            value = "https:" + value
-
-        # Add HTTPS when protocol is missing
-        else:
-            value = "https://" + value
-
-        # Validate without losing original Unicode hostname
-        HttpUrl(value)
-
-        # Add trailing slash when URL has no path
-        parts = urlsplit(value)
-
-        if not parts.path:
-            value = urlunsplit((
-                parts.scheme,
-                parts.netloc,
-                "/",
-                parts.query,
-                parts.fragment
-            ))
-
-        return value
-
+# ============================================================
+# 2. URL FEATURES RESPONSE
+# ============================================================
 
 class URLFeatures(BaseModel):
     url_length: int
@@ -122,11 +73,19 @@ class URLFeatures(BaseModel):
     has_url_shortener: int
 
 
+# ============================================================
+# 3. API RESPONSE
+# ============================================================
+
 class URLAnalysisResponse(BaseModel):
     status: str
     url: str
     features: URLFeatures
 
+
+# ============================================================
+# 4. URL ANALYSIS ENDPOINT
+# ============================================================
 
 @router.post(
     "/analyze",

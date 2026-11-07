@@ -3,7 +3,8 @@ import math
 import re
 import unicodedata
 from pathlib import Path
-from urllib.parse import urlparse, parse_qsl
+from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl
+from pydantic import HttpUrl, ValidationError
 
 import regex
 import tldextract
@@ -154,6 +155,71 @@ def calculate_entropy(value: str) -> float:
 
     return float(entropy)
 
+def normalize_url(value: str) -> str:
+    """
+    Canonical URL normalization shared by API and ML pipeline.
+    """
+
+    if not isinstance(value, str):
+        raise ValueError("URL must be a string.")
+
+    value = value.strip()
+
+    if not value:
+        raise ValueError("URL cannot be empty.")
+
+    # Reject malformed HTTP/HTTPS protocols.
+    if re.match(r"^https?:(?!//)", value, re.IGNORECASE):
+        raise ValueError("Malformed URL protocol.")
+
+    if re.match(r"^https?//", value, re.IGNORECASE):
+        raise ValueError("Malformed URL protocol.")
+
+    # Preserve valid HTTP/HTTPS URLs.
+    if re.match(r"^https?://", value, re.IGNORECASE):
+
+        remaining = re.sub(
+            r"^https?://",
+            "",
+            value,
+            count=1,
+            flags=re.IGNORECASE
+        )
+
+        if re.match(r"^https?://", remaining, re.IGNORECASE):
+            raise ValueError("Duplicate URL protocol.")
+
+    # Reject unsupported protocols.
+    elif re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", value):
+        raise ValueError("Only HTTP and HTTPS URLs are supported.")
+
+    # Handle protocol-relative URLs.
+    elif value.startswith("//"):
+        value = "https:" + value
+
+    # Add HTTPS when protocol is missing.
+    else:
+        value = "https://" + value
+
+    # Validate URL.
+    try:
+        HttpUrl(value)
+    except ValidationError as exc:
+        raise ValueError("Invalid URL.") from exc
+
+    # Add trailing slash when URL has no path.
+    parts = urlsplit(value)
+
+    if not parts.path:
+        value = urlunsplit((
+            parts.scheme,
+            parts.netloc,
+            "/",
+            parts.query,
+            parts.fragment
+        ))
+
+    return value
 
 def normalize_hostname(hostname: str) -> tuple[str, str]:
     """
@@ -459,7 +525,7 @@ def extract_url_features(url: str) -> dict:
     # TLD features
     # --------------------------------------------------------
 
-    tld_length = len(suffix)
+    tld_length = len(suffix.replace(".", ""))
 
     has_suspicious_tld = int(
         suffix.lower() in SUSPICIOUS_TLDS
