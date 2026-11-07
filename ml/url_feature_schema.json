@@ -1,112 +1,110 @@
 {
   "project": "CyberShield",
   "module": "URL Analysis",
-  "schema_version": "1.0",
+  "schema_version": "2.0",
+  "extractor_version": "2.0",
 
-  "description": "Feature schema for static URL-based phishing detection.",
+  "description": "Canonical 33-feature schema for static URL-based phishing detection.",
 
   "label_encoding": {
     "0": "Benign",
     "1": "Phishing"
   },
 
-  "feature_count": 20,
+  "feature_count": 33,
 
   "feature_order": [
     "url_length",
     "hostname_length",
+    "domain_length",
     "path_length",
-    "num_dots",
     "num_subdomains",
-    "num_hyphens",
-    "num_underscores",
-    "num_slashes",
-    "num_questionmarks",
-    "num_equals",
-    "num_digits",
-    "digit_ratio",
-    "special_char_count",
+    "subdomain_ratio",
+    "max_subdomain_length",
+    "domain_entropy",
+    "domain_digit_count",
+    "domain_hyphen_count",
     "contains_unicode",
     "non_ascii_count",
     "mixed_script",
     "contains_punycode",
-    "suspicious_keyword_count",
     "has_https",
-    "has_ip_address"
+    "has_ip_address",
+    "has_at_symbol_in_authority",
+    "has_double_slash_in_path",
+    "has_encoded_characters",
+    "percent_encoded_count",
+    "has_nonstandard_port",
+    "has_fragment",
+    "query_param_count",
+    "query_length",
+    "path_segment_count",
+    "max_path_segment_length",
+    "suspicious_keyword_subdomain_count",
+    "suspicious_keyword_domain_count",
+    "suspicious_keyword_path_count",
+    "suspicious_keyword_query_count",
+    "tld_length",
+    "has_suspicious_tld",
+    "has_url_shortener"
   ],
 
   "features": {
     "url_length": {
       "type": "integer",
-      "description": "Total number of characters in the URL."
+      "description": "Length of the normalized URL string."
     },
     "hostname_length": {
       "type": "integer",
-      "description": "Number of characters in the hostname."
+      "description": "Length of the lowercase IDNA-normalized ASCII hostname, excluding trailing root dot and IPv6 brackets."
+    },
+    "domain_length": {
+      "type": "integer",
+      "description": "Length of the registrable domain label, excluding the public suffix."
     },
     "path_length": {
       "type": "integer",
-      "description": "Number of characters in the URL path."
-    },
-    "num_dots": {
-      "type": "integer",
-      "description": "Total number of dots in the complete URL."
+      "description": "Number of characters in the parsed URL path."
     },
     "num_subdomains": {
       "type": "integer",
-      "description": "Estimated number of subdomains based on hostname labels. Returns 0 for IP addresses."
+      "description": "Number of subdomain labels determined using the Public Suffix List."
     },
-    "num_hyphens": {
-      "type": "integer",
-      "description": "Total number of hyphens in the URL."
-    },
-    "num_underscores": {
-      "type": "integer",
-      "description": "Total number of underscores in the URL."
-    },
-    "num_slashes": {
-      "type": "integer",
-      "description": "Total number of forward slashes in the URL."
-    },
-    "num_questionmarks": {
-      "type": "integer",
-      "description": "Total number of question marks in the URL."
-    },
-    "num_equals": {
-      "type": "integer",
-      "description": "Total number of equals signs in the URL."
-    },
-    "num_digits": {
-      "type": "integer",
-      "description": "Total number of numeric digits in the URL."
-    },
-    "digit_ratio": {
+    "subdomain_ratio": {
       "type": "float",
-      "description": "Ratio of numeric digits to total URL length."
+      "description": "Number of subdomain labels divided by total hostname labels. Zero when registrable domain information is unavailable."
     },
-    "special_char_count": {
+    "max_subdomain_length": {
       "type": "integer",
-      "description": "Total number of non-alphanumeric characters in the complete URL."
+      "description": "Length of the longest subdomain label."
+    },
+    "domain_entropy": {
+      "type": "float",
+      "description": "Shannon entropy of the lowercase IDNA ASCII registrable domain label."
+    },
+    "domain_digit_count": {
+      "type": "integer",
+      "description": "Number of numeric digits in the registrable domain label."
+    },
+    "domain_hyphen_count": {
+      "type": "integer",
+      "description": "Number of hyphens in the registrable domain label."
     },
     "contains_unicode": {
       "type": "integer",
-      "description": "1 if the hostname contains any non-ASCII character, otherwise 0."
+      "description": "1 if the original hostname contains non-ASCII characters, otherwise 0."
     },
     "non_ascii_count": {
       "type": "integer",
-      "description": "Number of non-ASCII characters in the hostname."
+      "description": "Number of non-ASCII code points in the original hostname."
     },
     "mixed_script": {
       "type": "integer",
-      "description": "1 if the hostname contains alphabetic characters identified as belonging to multiple scripts by the current Unicode-name heuristic, otherwise 0."
+      "description": "1 if alphabetic characters in the hostname belong to more than one Unicode script, excluding Common, Inherited and Unknown scripts."
     },
     "contains_punycode": {
       "type": "integer",
-      "description": "1 if any hostname label starts with xn--, otherwise 0."
-    },
-    "suspicious_keyword_count": {
-      "type": "integer",
-      "description": "Number of configured suspicious keywords found in the URL. Each keyword contributes at most 1."
+      "description": "1 if any original hostname label starts with xn--, otherwise 0."
     },
     "has_https": {
       "type": "integer",
@@ -114,8 +112,174 @@
     },
     "has_ip_address": {
       "type": "integer",
-      "description": "1 if the hostname is a valid IP address, otherwise 0."
+      "description": "1 if the hostname is a valid IPv4 or IPv6 address, otherwise 0."
+    },
+    "has_at_symbol_in_authority": {
+      "type": "integer",
+      "description": "1 if the URL authority contains an @ symbol, otherwise 0."
+    },
+    "has_double_slash_in_path": {
+      "type": "integer",
+      "description": "1 if the parsed URL path contains consecutive forward slashes, otherwise 0."
+    },
+    "has_encoded_characters": {
+      "type": "integer",
+      "description": "1 if the URL contains at least one valid percent-encoded character (%HH), otherwise 0."
+    },
+    "percent_encoded_count": {
+      "type": "integer",
+      "description": "Number of valid percent-encoded sequences (%HH) in the URL."
+    },
+    "has_nonstandard_port": {
+      "type": "integer",
+      "description": "1 if an explicitly specified port differs from the default port for its scheme, otherwise 0."
+    },
+    "has_fragment": {
+      "type": "integer",
+      "description": "1 if the URL contains a non-empty fragment, otherwise 0."
+    },
+    "query_param_count": {
+      "type": "integer",
+      "description": "Number of parsed query parameters, including parameters with blank values."
+    },
+    "query_length": {
+      "type": "integer",
+      "description": "Length of the raw parsed query string."
+    },
+    "path_segment_count": {
+      "type": "integer",
+      "description": "Number of non-empty path segments, ignoring repeated and trailing slashes."
+    },
+    "max_path_segment_length": {
+      "type": "integer",
+      "description": "Length of the longest non-empty raw path segment."
+    },
+    "suspicious_keyword_subdomain_count": {
+      "type": "integer",
+      "description": "Number of configured suspicious keywords found in subdomain labels. Each keyword counts at most once per component."
+    },
+    "suspicious_keyword_domain_count": {
+      "type": "integer",
+      "description": "Number of configured suspicious keywords found in the registrable domain label. Each keyword counts at most once."
+    },
+    "suspicious_keyword_path_count": {
+      "type": "integer",
+      "description": "Number of configured suspicious keywords found in URL path segments. Each keyword counts at most once per component."
+    },
+    "suspicious_keyword_query_count": {
+      "type": "integer",
+      "description": "Number of configured suspicious keywords found in query parameter names and values. Each keyword counts at most once."
+    },
+    "tld_length": {
+      "type": "integer",
+      "description": "Length of the complete Public Suffix List suffix, excluding dots."
+    },
+    "has_suspicious_tld": {
+      "type": "integer",
+      "description": "1 if the complete public suffix matches the configured suspicious TLD list, otherwise 0."
+    },
+    "has_url_shortener": {
+      "type": "integer",
+      "description": "1 if the registrable domain matches a configured URL shortening service, otherwise 0."
     }
+  },
+
+  "binary_feature_convention": {
+    "0": "No",
+    "1": "Yes"
+  },
+
+  "suspicious_keywords": {
+    "version": "keyword_list_v1",
+    "values": [
+      "login",
+      "signin",
+      "sign-in",
+      "signon",
+      "verify",
+      "verification",
+      "account",
+      "update",
+      "secure",
+      "security",
+      "banking",
+      "password",
+      "passcode",
+      "credential",
+      "confirm",
+      "confirmation",
+      "authenticate",
+      "authentication",
+      "wallet",
+      "payment",
+      "invoice",
+      "billing",
+      "recover",
+      "recovery",
+      "reset",
+      "webscr",
+      "free"
+    ],
+    "matching": "Case-insensitive complete token matching. Tokens are separated by non-alphanumeric characters. Each keyword counts at most once per component."
+  },
+
+  "suspicious_tlds": {
+    "version": "suspicious_tlds_v1",
+    "values": [
+      "zip",
+      "mov",
+      "top",
+      "xyz",
+      "click",
+      "work",
+      "gq",
+      "tk",
+      "ml",
+      "cf",
+      "ga"
+    ],
+    "matching": "Exact comparison against the complete PSL suffix."
+  },
+
+  "url_shorteners": {
+    "version": "url_shorteners_v1",
+    "values": [
+      "bit.ly",
+      "tinyurl.com",
+      "t.co",
+      "goo.gl",
+      "is.gd",
+      "tiny.cc",
+      "cutt.ly",
+      "ow.ly",
+      "buff.ly",
+      "lnkd.in",
+      "rebrand.ly",
+      "shorturl.at",
+      "t.ly",
+      "dub.co",
+      "short.io",
+      "rb.gy",
+      "v.gd",
+      "s.id",
+      "amzn.to",
+      "fb.me"
+    ],
+    "matching": "Exact comparison against the registrable domain. No substring matching or redirect resolution."
+  },
+
+  "public_suffix_list": {
+    "file": "ml/data/public_suffix_list.dat",
+    "library": "tldextract",
+    "library_version": "5.4.0",
+    "include_private_domains": true,
+    "network_access": false,
+    "sha256": "B69315C085D53972724B8F2DF111FFC329B0C84FE0A47D62C8C91655CC774A38"
+  },
+
+  "dependencies": {
+    "tldextract": "5.4.0",
+    "regex": "2026.11.7"
   },
 
   "label": {
@@ -130,9 +294,13 @@
   },
 
   "training_requirements": {
-    "input_features": 20,
+    "input_features": 33,
     "exclude_label_from_prediction_input": true,
     "feature_order_must_match": true,
-    "static_analysis_only": true
+    "same_feature_extractor_for_training_and_inference": true,
+    "same_public_suffix_list_for_training_and_inference": true,
+    "static_analysis_only": true,
+    "no_live_dns_or_reputation_checks": true,
+    "no_url_visiting_or_redirect_resolution": true
   }
 }

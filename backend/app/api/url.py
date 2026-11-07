@@ -1,9 +1,9 @@
+
 import re
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter
 from pydantic import BaseModel, HttpUrl, Field, field_validator
-from fastapi import APIRouter
-from pydantic import BaseModel, HttpUrl, Field
 
 from app.services.url_feature_extractor import extract_url_features
 
@@ -15,7 +15,7 @@ router = APIRouter(
 
 
 class URLRequest(BaseModel):
-    url: HttpUrl = Field(..., max_length=2048)
+    url: str = Field(..., max_length=2048)
 
     @field_validator("url", mode="before")
     @classmethod
@@ -40,52 +40,86 @@ class URLRequest(BaseModel):
         if re.match(r"^https?://", value, re.IGNORECASE):
 
             remaining = re.sub(
-                r"^https?://", "", value, count=1, flags=re.IGNORECASE
+                r"^https?://",
+                "",
+                value,
+                count=1,
+                flags=re.IGNORECASE
             )
 
             if re.match(r"^https?://", remaining, re.IGNORECASE):
                 raise ValueError("Duplicate URL protocol.")
 
-            return value
-
-        # Reject other explicitly provided protocols
-        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", value):
+        # Reject unsupported protocols
+        elif re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", value):
             raise ValueError("Only HTTP and HTTPS URLs are supported.")
 
         # Handle protocol-relative URLs
-        if value.startswith("//"):
-            return "https:" + value
+        elif value.startswith("//"):
+            value = "https:" + value
 
         # Add HTTPS when protocol is missing
-        return "https://" + value
+        else:
+            value = "https://" + value
+
+        # Validate without losing original Unicode hostname
+        HttpUrl(value)
+
+        # Add trailing slash when URL has no path
+        parts = urlsplit(value)
+
+        if not parts.path:
+            value = urlunsplit((
+                parts.scheme,
+                parts.netloc,
+                "/",
+                parts.query,
+                parts.fragment
+            ))
+
+        return value
 
 
 class URLFeatures(BaseModel):
     url_length: int
     hostname_length: int
+    domain_length: int
     path_length: int
 
-    num_dots: int
     num_subdomains: int
-    num_hyphens: int
-    num_underscores: int
-    num_slashes: int
-    num_questionmarks: int
-    num_equals: int
-
-    num_digits: int
-    digit_ratio: float
-    special_char_count: int
+    subdomain_ratio: float
+    max_subdomain_length: int
+    domain_entropy: float
+    domain_digit_count: int
+    domain_hyphen_count: int
 
     contains_unicode: int
     non_ascii_count: int
     mixed_script: int
     contains_punycode: int
 
-    suspicious_keyword_count: int
-
     has_https: int
     has_ip_address: int
+    has_at_symbol_in_authority: int
+    has_double_slash_in_path: int
+    has_encoded_characters: int
+    percent_encoded_count: int
+    has_nonstandard_port: int
+    has_fragment: int
+
+    query_param_count: int
+    query_length: int
+    path_segment_count: int
+    max_path_segment_length: int
+
+    suspicious_keyword_subdomain_count: int
+    suspicious_keyword_domain_count: int
+    suspicious_keyword_path_count: int
+    suspicious_keyword_query_count: int
+
+    tld_length: int
+    has_suspicious_tld: int
+    has_url_shortener: int
 
 
 class URLAnalysisResponse(BaseModel):
@@ -100,7 +134,7 @@ class URLAnalysisResponse(BaseModel):
 )
 def analyze_url(request: URLRequest):
 
-    url = str(request.url)
+    url = request.url
 
     features = extract_url_features(url)
 
